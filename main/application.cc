@@ -1465,3 +1465,29 @@ void Application::ResetProtocol() {
         protocol_.reset();
     });
 }
+// ---------------------------------------------------------------------
+// Cooper: envía una frase de texto al servidor como si fuera una
+// detección de voz. Usado por el canal de texto por serie (serial_text.cc).
+// ---------------------------------------------------------------------
+void Application::SendTextToServer(const std::string& text) {
+    Schedule([this, text]() {
+        if (!protocol_) {
+            ESP_LOGW(TAG, "SendTextToServer: protocolo no inicializado");
+            return;
+        }
+        auto state = GetDeviceState();
+        if (state == kDeviceStateSpeaking) {
+            AbortSpeaking(kAbortReasonNone);
+        }
+        if (!protocol_->IsAudioChannelOpened()) {
+            SetDeviceState(kDeviceStateConnecting);
+            if (!protocol_->OpenAudioChannel()) {
+                ESP_LOGE(TAG, "SendTextToServer: no se pudo abrir el canal");
+                SetDeviceState(kDeviceStateIdle);
+                return;
+            }
+        }
+        protocol_->SendWakeWordDetected(text);
+        SetListeningMode(GetDefaultListeningMode());
+    });
+}
